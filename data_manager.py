@@ -16,6 +16,17 @@ class DataManager:
             'Content-Type': 'application/json'
             }
 
+    # Returns a list of flights_to - as IATA codes
+    def get_current_flight_prices(self) -> dict:
+        iata_prices = {}
+        get_cities = requests.get(ENDPOINT, headers=self.header)
+        get_cities.raise_for_status()
+        get_cities = get_cities.json()
+
+        for row in get_cities['prices']:
+            iata_prices[row['iataCode']] = row['lowestPrice']
+        return iata_prices
+
     # Sets IATA codes in the spreadsheet
     def update_IATA_codes(self) -> None:
         get_cities = requests.get(ENDPOINT, headers=self.header)
@@ -39,12 +50,28 @@ class DataManager:
                 send_code.raise_for_status
 
     # Get new prices and update them in the sheet
-    def update_prices(self) -> None:
-        # Get flight prices
-        flight_prices = {}
+    # Returns a tuple:
+    #   - bool indicates the change,
+    #   - dict is a dictionary of prices
+    #   (doesn't matter if price changed)
+    def update_prices(self) -> (bool, dict):
+        get_flights = self.get_current_flight_prices()  # dict with lowest prices yet
+        new_prices = {}  # dict with prices for today
+        search = fs.FlightSearch()
+        change = False
 
-        # Add prices for all flights to prices dict
-        for row in get_prices['data']:
-            prices[row['flyTo']] = row['price']
+        # Search and save current prices
+        for flight in get_flights:
+            flight_status = search.check_flight(flight)
+            new_prices[flight] = flight_status['data'][0]['price']
 
-        get_sheet = requests.get(ENDPOINT, headers=self.header)
+        # Compare prices
+        for flight in get_flights:
+            if get_flights[flight] > new_prices[flight]:
+                get_flights[flight] = new_prices[flight]
+                change = True
+        return change, get_flights
+    
+    # Update my spreadsheet with new values
+    def update_spreadsheet(self, prices: dict) -> None:
+

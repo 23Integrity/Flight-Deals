@@ -3,5 +3,7 @@
 import data_manager
 import flight_search
 
-fs = flight_search.FlightSearch()
-fs.check_flight('CDG')
+
+dm = data_manager.DataManager()
+check = dm.update_prices()
+
